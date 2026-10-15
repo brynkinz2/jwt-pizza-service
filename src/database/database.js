@@ -75,10 +75,20 @@ class DB {
     }
   }
 
-  async getUsers() {
+  async getUsers(page = 0, limit = 10) {
     const connection = await this.getConnection();
     try {
-      const users = await this.query(connection, `SELECT id, name, email FROM user`);
+      const currentPage = Math.max(0, Number.parseInt(page, 10) || 0);
+      const pageLimit = Math.max(1, Number.parseInt(limit, 10) || 10);
+      const offset = currentPage * pageLimit;
+      let users = await this.query(
+        connection,
+        `SELECT id, name, email FROM user ORDER BY id LIMIT ? OFFSET ?`,
+        [pageLimit + 1, offset],
+      );
+      const more = users.length > pageLimit;
+      if (more) users = users.slice(0, pageLimit);
+
       for (const user of users) {
         const roleResult = await this.query(connection, `SELECT role, objectId FROM userRole WHERE userId=?`, [user.id]);
         user.roles = roleResult.map((role) => ({
@@ -86,7 +96,7 @@ class DB {
           role: role.role,
         }));
       }
-      return users;
+      return [users, more];
     } finally {
       connection.end();
     }

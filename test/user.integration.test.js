@@ -143,7 +143,7 @@ test("list users unauthorized", async () => {
 test("list users", async () => {
   const [user, userToken] = await registerUser(request(app));
   const listUsersRes = await request(app)
-    .get("/api/user")
+    .get("/api/user?page=0&limit=1000")
     .set("Authorization", "Bearer " + userToken);
   expect(listUsersRes.status).toBe(200);
   assert.ok(Array.isArray(listUsersRes.body.users), "response should include a users array");
@@ -151,6 +151,21 @@ test("list users", async () => {
     listUsersRes.body.users.some((listedUser) => listedUser.id === user.id),
     "response should include the registered user",
   );
+});
+
+test("list users paginates results", async () => {
+  let userToken;
+  for (let index = 0; index < 3; index++) {
+    const [, token] = await registerUser(request(app));
+    userToken = token;
+  }
+
+  const listUsersRes = await request(app)
+    .get("/api/user?page=0&limit=2")
+    .set("Authorization", "Bearer " + userToken);
+
+  assert.equal(listUsersRes.body.users.length, 2);
+  assert.equal(listUsersRes.body.more, true);
 });
 
 async function registerUser(service) {
