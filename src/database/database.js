@@ -75,16 +75,17 @@ class DB {
     }
   }
 
-  async getUsers(page = 0, limit = 10) {
+  async getUsers(page = 0, limit = 10, nameFilter = '*') {
     const connection = await this.getConnection();
     try {
       const currentPage = Math.max(0, Number.parseInt(page, 10) || 0);
       const pageLimit = Math.max(1, Number.parseInt(limit, 10) || 10);
       const offset = currentPage * pageLimit;
+      const searchName = String(nameFilter || '*').replace(/\*/g, '%');
       let users = await this.query(
         connection,
-        `SELECT id, name, email FROM user ORDER BY id LIMIT ? OFFSET ?`,
-        [pageLimit + 1, offset],
+        `SELECT id, name, email FROM user WHERE name LIKE ? ORDER BY id LIMIT ? OFFSET ?`,
+        [searchName, pageLimit + 1, offset],
       );
       const more = users.length > pageLimit;
       if (more) users = users.slice(0, pageLimit);

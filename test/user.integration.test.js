@@ -168,6 +168,23 @@ test("list users paginates results", async () => {
   assert.equal(listUsersRes.body.more, true);
 });
 
+test("list users filters by name", async () => {
+  const registration = await request(app)
+    .post("/api/auth")
+    .send({
+      name: "TDD Filter Match",
+      email: `filter-${randomName()}@test.com`,
+      password: "a",
+    });
+  const listUsersRes = await request(app)
+    .get("/api/user?page=0&limit=100&name=*TDD%20Filter*")
+    .set("Authorization", "Bearer " + registration.body.token);
+
+  assert.equal(listUsersRes.status, 200);
+  assert.equal(listUsersRes.body.users.length, 1);
+  assert.equal(listUsersRes.body.users[0].id, registration.body.user.id);
+});
+
 async function registerUser(service) {
   const testUser = {
     name: "pizza diner",
