@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const app = require("../src/service.js");
+const { setAuth } = require("../src/routes/authRouter.js");
 
 const { DB } = require("../src/database/database.js");
 
@@ -44,6 +45,9 @@ function request(pathOrApp, options) {
       },
       post(path) {
         return createRequest("POST", path);
+      },
+      delete(path) {
+        return createRequest("DELETE", path);
       },
     };
   }
@@ -185,6 +189,30 @@ test("list users filters by name", async () => {
   assert.equal(listUsersRes.body.users[0].id, registration.body.user.id);
 });
 
+test("a non-admin cannot delete a user", async () => {
+  const [targetUser] = await registerUser(request(app));
+  const [, dinerToken] = await registerUser(request(app));
+  const deleteResponse = await request(app)
+    .delete(`/api/user/${targetUser.id}`)
+    .set("Authorization", "Bearer " + dinerToken);
+
+  assert.equal(deleteResponse.status, 403);
+});
+
+test("an admin can delete a user and revoke their token", async () => {
+  const [targetUser, targetToken] = await registerUser(request(app));
+  const [, adminToken] = await registerAdmin();
+  const deleteResponse = await request(app)
+    .delete(`/api/user/${targetUser.id}`)
+    .set("Authorization", "Bearer " + adminToken);
+  const profileResponse = await request("/api/user/me", {
+    headers: { Authorization: `Bearer ${targetToken}` },
+  });
+
+  assert.equal(deleteResponse.status, 200);
+  assert.equal(profileResponse.status, 401);
+});
+
 async function registerUser(service) {
   const testUser = {
     name: "pizza diner",
@@ -195,6 +223,18 @@ async function registerUser(service) {
   registerRes.body.user.password = testUser.password;
 
   return [registerRes.body.user, registerRes.body.token];
+}
+
+async function registerAdmin() {
+  const admin = await DB.addUser({
+    name: "TDD Admin",
+    email: `admin-${randomName()}@test.com`,
+    password: "a",
+    roles: [{ role: "admin" }],
+  });
+  createdUserIds.add(admin.id);
+  const token = await setAuth(admin);
+  return [admin, token];
 }
 
 function randomName() {
