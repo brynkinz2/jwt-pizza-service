@@ -7,6 +7,7 @@ const { DB } = require("../src/database/database.js");
 let server;
 let baseUrl;
 let createdUserId;
+const createdUserIds = new Set();
 
 test.before(async () => {
   await DB.initialized;
@@ -22,16 +23,12 @@ test.after(async () => {
     });
   }
 
-  if (createdUserId) {
+  for (const userId of new Set([createdUserId, ...createdUserIds].filter(Boolean))) {
     const connection = await DB._getConnection();
     try {
-      await connection.execute("DELETE FROM auth WHERE userId=?", [
-        createdUserId,
-      ]);
-      await connection.execute("DELETE FROM userRole WHERE userId=?", [
-        createdUserId,
-      ]);
-      await connection.execute("DELETE FROM user WHERE id=?", [createdUserId]);
+      await connection.execute("DELETE FROM auth WHERE userId=?", [userId]);
+      await connection.execute("DELETE FROM userRole WHERE userId=?", [userId]);
+      await connection.execute("DELETE FROM user WHERE id=?", [userId]);
     } finally {
       await connection.end();
     }
@@ -70,10 +67,14 @@ function createRequest(method, path) {
     },
     then(resolve, reject) {
       return fetch(`${baseUrl}${path}`, { method, headers, body })
-        .then(async (response) => ({
-          status: response.status,
-          body: await response.json(),
-        }))
+        .then(async (response) => {
+          const responseBody = await response.json();
+          if (method === "POST" && path === "/api/auth") {
+            const userId = responseBody.user?.id;
+            if (userId) createdUserIds.add(userId);
+          }
+          return { status: response.status, body: responseBody };
+        })
         .then(resolve, reject);
     },
   };
@@ -145,6 +146,11 @@ test("list users", async () => {
     .get("/api/user")
     .set("Authorization", "Bearer " + userToken);
   expect(listUsersRes.status).toBe(200);
+  assert.ok(Array.isArray(listUsersRes.body.users), "response should include a users array");
+  assert.ok(
+    listUsersRes.body.users.some((listedUser) => listedUser.id === user.id),
+    "response should include the registered user",
+  );
 });
 
 async function registerUser(service) {
