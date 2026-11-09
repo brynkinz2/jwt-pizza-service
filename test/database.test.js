@@ -185,7 +185,7 @@ test('user updates and deletes commit on success and roll back on failure', asyn
     return [];
   });
   const { database, calls } = harness;
-  database.getUser = async (email, password) => ({ id: 5, email, password: undefined });
+  database.getUser = async (email) => ({ id: 5, email, password: undefined });
 
   const updated = await database.updateUser(5, 'Updated', 'updated@example.com', 'new-password');
   assert.equal(updated.email, 'updated@example.com');
@@ -278,7 +278,7 @@ test('franchise and store operations attach related records and handle failures'
   assert.equal(harness.rollbackCount, 1);
 });
 
-test('connection, token, ID, and initialization helpers use configured MySQL settings', async (t) => {
+test('connection, token, ID, and initialization helpers use configured MySQL settings', async () => {
   const harness = makeDatabase((sql, params) => {
     if (sql.includes('INFORMATION_SCHEMA.SCHEMATA')) return [{ SCHEMA_NAME: 'pizza' }];
     if (sql === 'SELECT id FROM menu WHERE id=?') return params[0] === 7 ? [{ id: 7 }] : [];
