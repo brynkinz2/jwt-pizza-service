@@ -54,6 +54,12 @@ jobs:
               url: 'https://pizza-factory.cs329.click',
               apiKey: '${{ secrets.FACTORY_API_KEY }}',
             },
+            metrics: {
+              source: 'jwt-pizza-service',
+              endpointUrl: '${{ secrets.METRICS_ENDPOINT_URL, }}',
+              apiKey: '${{ secrets.METRICS_API_KEY }}',
+              accountId: '${{ secrets.METRICS_ACCOUNT_ID_KEY }}',
+            },            
           };" > src/config.js
       - name: Create dist
         run: |
