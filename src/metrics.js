@@ -177,11 +177,21 @@ function sendMetricsPeriodically(period = 60_000) {
   if (metricsTimer) return metricsTimer;
 
   metricsTimer = setInterval(() => {
-    retryBatches.push(minuteMetrics());
-    void drainBatches();
+    void flushMetrics();
   }, period);
   metricsTimer.unref?.();
   return metricsTimer;
+}
+
+async function flushMetrics() {
+  retryBatches.push(minuteMetrics());
+  await drainBatches();
+}
+
+function stopMetricsPeriodically() {
+  if (!metricsTimer) return;
+  clearInterval(metricsTimer);
+  metricsTimer = undefined;
 }
 
 function requestTracker(req, res, next) {
@@ -215,4 +225,11 @@ function pizzaPurchase(success, latency, price, quantity = 1) {
   }
 }
 
-module.exports = { requestTracker, authAttempt, pizzaPurchase, sendMetricsPeriodically };
+module.exports = {
+  requestTracker,
+  authAttempt,
+  pizzaPurchase,
+  sendMetricsPeriodically,
+  flushMetrics,
+  stopMetricsPeriodically,
+};

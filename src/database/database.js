@@ -5,8 +5,9 @@ const { StatusCodeError } = require('../endpointHelper.js');
 const { Role } = require('../model/model.js');
 const dbModel = require('./dbModel.js');
 class DB {
-  constructor() {
-    this.initialized = this.initializeDatabase();
+  constructor({ initialize = true, createConnection = mysql.createConnection } = {}) {
+    this.createConnection = createConnection;
+    this.initialized = initialize ? this.initializeDatabase() : Promise.resolve();
   }
 
   async getMenu() {
@@ -362,7 +363,7 @@ class DB {
   }
 
   async _getConnection(setUse = true) {
-    const connection = await mysql.createConnection({
+    const connection = await this.createConnection({
       host: config.db.connection.host,
       user: config.db.connection.user,
       password: config.db.connection.password,
@@ -411,5 +412,16 @@ class DB {
   }
 }
 
-const db = new DB();
-module.exports = { Role, DB: db };
+let db;
+module.exports = {
+  Role,
+  DB: undefined,
+  Database: DB,
+};
+Object.defineProperty(module.exports, 'DB', {
+  enumerable: true,
+  get() {
+    if (!db) db = new DB();
+    return db;
+  },
+});
