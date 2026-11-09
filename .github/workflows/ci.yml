@@ -56,9 +56,9 @@ jobs:
             },
             metrics: {
               source: 'jwt-pizza-service',
-              endpointUrl: '${{ secrets.METRICS_ENDPOINT_URL, }}',
+              endpointUrl: '${{ secrets.METRICS_ENDPOINT_URL }}',
               apiKey: '${{ secrets.METRICS_API_KEY }}',
-              accountId: '${{ secrets.METRICS_ACCOUNT_ID_KEY }}',
+              accountId: '${{ secrets.METRICS_ACCOUNT_ID }}',
             },            
           };" > src/config.js
       - name: Create dist
