@@ -116,7 +116,9 @@ test('batches minute metrics and retries failed Grafana sends', async (t) => {
   assert.equal(metricValue(findMetric(failedSendBatch, 'pizzas.revenue')), 16);
   assert.ok(findMetric(failedSendBatch, 'system.cpu.utilization'));
   assert.ok(findMetric(failedSendBatch, 'system.memory.utilization'));
-  assert.ok(findMetric(failedSendBatch, 'http.server.duration.average', 'endpoint', 'GET /api/order/menu'));
+  const serviceLatency = findMetric(failedSendBatch, 'http.server.duration.average');
+  assert.ok(serviceLatency);
+  assert.deepStrictEqual(serviceLatency.gauge.dataPoints[0].attributes, []);
   assert.equal(metricValue(findMetric(failedSendBatch, 'pizza.creation.duration.average')), 80);
   assert.ok(firstMetrics.every((metric) => metric.unit));
   assert.ok(

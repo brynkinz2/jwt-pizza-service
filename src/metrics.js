@@ -21,7 +21,7 @@ let previousCpuTimes = cpuTimes();
 function newMinute() {
   return {
     activeUsers: new Set(),
-    endpointLatency: new Map(),
+    endpointLatency: { count: 0, totalMs: 0 },
     pizzaLatency: { count: 0, totalMs: 0 },
   };
 }
@@ -36,13 +36,6 @@ const totals = {
   pizzaFailures: 0,
   revenue: 0,
 };
-
-function addLatency(bucket, key, latency) {
-  const aggregate = bucket.get(key) || { count: 0, totalMs: 0 };
-  aggregate.count += 1;
-  aggregate.totalMs += latency;
-  bucket.set(key, aggregate);
-}
 
 function makeMetric(name, type, value, unit, attributes = []) {
   const metric = {
@@ -121,14 +114,13 @@ function minuteMetrics() {
     );
   }
 
-  for (const [endpoint, latency] of current.endpointLatency) {
+  if (current.endpointLatency.count > 0) {
     metrics.push(
       makeMetric(
         "http.server.duration.average",
         "gauge",
-        latency.totalMs / latency.count,
+        current.endpointLatency.totalMs / current.endpointLatency.count,
         "ms",
-        [{ key: "endpoint", value: { stringValue: endpoint } }],
       ),
     );
   }
@@ -225,9 +217,8 @@ function requestTracker(req, res, next) {
     }
     if (req.user?.id !== undefined) minute.activeUsers.add(String(req.user.id));
 
-    const route = req.route?.path;
-    const endpoint = `${method} ${req.baseUrl || ""}${route || req.path}`;
-    addLatency(minute.endpointLatency, endpoint, Date.now() - startedAt);
+    minute.endpointLatency.count += 1;
+    minute.endpointLatency.totalMs += Date.now() - startedAt;
   });
   next();
 }
