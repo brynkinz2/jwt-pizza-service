@@ -119,19 +119,25 @@ test('batches minute metrics and retries failed Grafana sends', async (t) => {
   assert.ok(findMetric(failedSendBatch, 'http.server.duration.average', 'endpoint', 'GET /api/order/menu'));
   assert.equal(metricValue(findMetric(failedSendBatch, 'pizza.creation.duration.average')), 80);
   assert.ok(firstMetrics.every((metric) => metric.unit));
+  assert.ok(
+    firstMetrics
+      .filter((metric) => metric.sum)
+      .every((metric) => metric.sum.aggregationTemporality === 'AGGREGATION_TEMPORALITY_CUMULATIVE'),
+  );
 
   // The failed minute is retried before the next minute's metrics are sent.
   metrics.authAttempt(true);
   await metrics.flushMetrics();
   assert.equal(sentBatches.length, 3);
   assert.deepStrictEqual(sentBatches[1], failedSendBatch);
-  assert.equal(metricValue(findMetric(sentBatches[2], 'auth.attempts', 'outcome', 'success')), 1);
+  assert.equal(metricValue(findMetric(sentBatches[2], 'auth.attempts', 'outcome', 'success')), 2);
 
   // A quiet minute still reports zero counters and active users, but no latency sample.
   await metrics.flushMetrics();
   const quietMinute = sentBatches[3];
-  assert.equal(metricValue(findMetric(quietMinute, 'http.requests.total')), 0);
+  assert.equal(metricValue(findMetric(quietMinute, 'http.requests.total')), 6);
   assert.equal(metricValue(findMetric(quietMinute, 'users.active')), 0);
+  assert.equal(metricValue(findMetric(quietMinute, 'auth.attempts', 'outcome', 'success')), 2);
   assert.equal(findMetric(quietMinute, 'pizza.creation.duration.average'), undefined);
 
   assert.throws(() => metrics.sendMetricsPeriodically(0), /positive number/);

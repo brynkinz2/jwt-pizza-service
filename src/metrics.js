@@ -5,6 +5,7 @@ const METHODS = ["GET", "PUT", "POST", "DELETE"];
 let metricsTimer;
 let sending = false;
 const retryBatches = [];
+const metricStartTimeUnixNano = String(Date.now() * 1_000_000);
 
 function cpuTimes() {
   return os.cpus().reduce((totals, cpu) => {
@@ -19,20 +20,22 @@ let previousCpuTimes = cpuTimes();
 
 function newMinute() {
   return {
-    requestTotal: 0,
-    requestsByMethod: Object.fromEntries(METHODS.map((method) => [method, 0])),
     activeUsers: new Set(),
-    authSuccess: 0,
-    authFailure: 0,
-    pizzasSold: 0,
-    pizzaFailures: 0,
-    revenue: 0,
     endpointLatency: new Map(),
     pizzaLatency: { count: 0, totalMs: 0 },
   };
 }
 
 let minute = newMinute();
+const totals = {
+  requestTotal: 0,
+  requestsByMethod: Object.fromEntries(METHODS.map((method) => [method, 0])),
+  authSuccess: 0,
+  authFailure: 0,
+  pizzasSold: 0,
+  pizzaFailures: 0,
+  revenue: 0,
+};
 
 function addLatency(bucket, key, latency) {
   const aggregate = bucket.get(key) || { count: 0, totalMs: 0 };
@@ -51,12 +54,13 @@ function makeMetric(name, type, value, unit, attributes = []) {
           asDouble: value,
           timeUnixNano: String(Date.now() * 1_000_000),
           attributes,
+          ...(type === "sum" ? { startTimeUnixNano: metricStartTimeUnixNano } : {}),
         },
       ],
     },
   };
   if (type === "sum") {
-    metric.sum.aggregationTemporality = "AGGREGATION_TEMPORALITY_DELTA";
+    metric.sum.aggregationTemporality = "AGGREGATION_TEMPORALITY_CUMULATIVE";
     metric.sum.isMonotonic = true;
   }
   return metric;
@@ -85,17 +89,17 @@ function minuteMetrics() {
   minute = newMinute();
 
   const metrics = [
-    makeMetric("http.requests.total", "sum", current.requestTotal, "1"),
+    makeMetric("http.requests.total", "sum", totals.requestTotal, "1"),
     makeMetric("users.active", "gauge", current.activeUsers.size, "1"),
-    makeMetric("auth.attempts", "sum", current.authSuccess, "1", [
+    makeMetric("auth.attempts", "sum", totals.authSuccess, "1", [
       { key: "outcome", value: { stringValue: "success" } },
     ]),
-    makeMetric("auth.attempts", "sum", current.authFailure, "1", [
+    makeMetric("auth.attempts", "sum", totals.authFailure, "1", [
       { key: "outcome", value: { stringValue: "failure" } },
     ]),
-    makeMetric("pizzas.sold", "sum", current.pizzasSold, "1"),
-    makeMetric("pizzas.creation.failures", "sum", current.pizzaFailures, "1"),
-    makeMetric("pizzas.revenue", "sum", current.revenue, "USD"),
+    makeMetric("pizzas.sold", "sum", totals.pizzasSold, "1"),
+    makeMetric("pizzas.creation.failures", "sum", totals.pizzaFailures, "1"),
+    makeMetric("pizzas.revenue", "sum", totals.revenue, "USD"),
     makeMetric("system.cpu.utilization", "gauge", sampleCpuPercentage(), "%"),
     makeMetric(
       "system.memory.utilization",
@@ -110,7 +114,7 @@ function minuteMetrics() {
       makeMetric(
         "http.requests.by_method",
         "sum",
-        current.requestsByMethod[method],
+        totals.requestsByMethod[method],
         "1",
         [{ key: "method", value: { stringValue: method } }],
       ),
@@ -215,8 +219,10 @@ function requestTracker(req, res, next) {
   const startedAt = Date.now();
   res.once("finish", () => {
     const method = req.method.toUpperCase();
-    minute.requestTotal += 1;
-    if (METHODS.includes(method)) minute.requestsByMethod[method] += 1;
+    totals.requestTotal += 1;
+    if (METHODS.includes(method)) {
+      totals.requestsByMethod[method] += 1;
+    }
     if (req.user?.id !== undefined) minute.activeUsers.add(String(req.user.id));
 
     const route = req.route?.path;
@@ -227,18 +233,21 @@ function requestTracker(req, res, next) {
 }
 
 function authAttempt(success) {
-  if (success) minute.authSuccess += 1;
-  else minute.authFailure += 1;
+  if (success) {
+    totals.authSuccess += 1;
+  } else {
+    totals.authFailure += 1;
+  }
 }
 
 function pizzaPurchase(success, latency, price, quantity = 1) {
   minute.pizzaLatency.count += 1;
   minute.pizzaLatency.totalMs += latency;
   if (success) {
-    minute.pizzasSold += quantity;
-    minute.revenue += price;
+    totals.pizzasSold += quantity;
+    totals.revenue += price;
   } else {
-    minute.pizzaFailures += 1;
+    totals.pizzaFailures += 1;
   }
 }
 
