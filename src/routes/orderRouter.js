@@ -100,9 +100,16 @@ orderRouter.post(
         logger.logFactoryRequest(factoryRequestBody, { error: error.message }, 502);
         throw error;
       }
-      const responseText = await r.text();
       let j;
-      try { j = JSON.parse(responseText); } catch { j = responseText; }
+      if (typeof r.text === 'function') {
+        const responseText = await r.text();
+        try { j = JSON.parse(responseText); } catch { j = responseText; }
+      } else if (typeof r.json === 'function') {
+        // Keep compatibility with lightweight fetch mocks that expose only json().
+        j = await r.json();
+      } else {
+        j = null;
+      }
       logger.logFactoryRequest(factoryRequestBody, j, r.status);
       if (r.ok) {
         succeeded = true;
