@@ -4,6 +4,7 @@ const config = require('../config.js');
 const { StatusCodeError } = require('../endpointHelper.js');
 const { Role } = require('../model/model.js');
 const dbModel = require('./dbModel.js');
+const logger = require('../logger.js');
 class DB {
   constructor({ initialize = true, createConnection = mysql.createConnection } = {}) {
     this.createConnection = createConnection;
@@ -344,12 +345,15 @@ class DB {
   }
 
   async query(connection, sql, params) {
+    logger.logDatabaseQuery(sql);
     const [results] = await connection.execute(sql, params);
     return results;
   }
 
   async getID(connection, key, value, table) {
-    const [rows] = await connection.execute(`SELECT id FROM ${table} WHERE ${key}=?`, [value]);
+    const sql = `SELECT id FROM ${table} WHERE ${key}=?`;
+    logger.logDatabaseQuery(sql);
+    const [rows] = await connection.execute(sql, [value]);
     if (rows.length > 0) {
       return rows[0].id;
     }
@@ -371,6 +375,7 @@ class DB {
       decimalNumbers: true,
     });
     if (setUse) {
+      logger.logDatabaseQuery(`USE ${config.db.connection.database}`);
       await connection.query(`USE ${config.db.connection.database}`);
     }
     return connection;
@@ -383,7 +388,9 @@ class DB {
         const dbExists = await this.checkDatabaseExists(connection);
         console.log(dbExists ? 'Database exists' : 'Database does not exist, creating it');
 
+        logger.logDatabaseQuery(`CREATE DATABASE IF NOT EXISTS ${config.db.connection.database}`);
         await connection.query(`CREATE DATABASE IF NOT EXISTS ${config.db.connection.database}`);
+        logger.logDatabaseQuery(`USE ${config.db.connection.database}`);
         await connection.query(`USE ${config.db.connection.database}`);
 
         if (!dbExists) {
@@ -391,6 +398,7 @@ class DB {
         }
 
         for (const statement of dbModel.tableCreateStatements) {
+          logger.logDatabaseQuery(statement);
           await connection.query(statement);
         }
 
@@ -402,12 +410,15 @@ class DB {
         connection.end();
       }
     } catch (err) {
-      console.error(JSON.stringify({ message: 'Error initializing database', exception: err.message, connection: config.db.connection }));
+      logger.logException(err);
+      console.error('Error initializing database');
     }
   }
 
   async checkDatabaseExists(connection) {
-    const [rows] = await connection.execute(`SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?`, [config.db.connection.database]);
+    const sql = `SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?`;
+    logger.logDatabaseQuery(sql);
+    const [rows] = await connection.execute(sql, [config.db.connection.database]);
     return rows.length > 0;
   }
 }
