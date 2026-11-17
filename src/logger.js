@@ -1,9 +1,11 @@
 const { AsyncLocalStorage } = require('node:async_hooks');
+const config = require('./config.js');
 
 const context = new AsyncLocalStorage();
 const sensitiveKey = /(authorization|password|passwd|token|secret|api.?key|credential|email|name|phone|address|report.?url|stack)/i;
-const source = process.env.GRAFANA_SOURCE || 'jwt-pizza-service';
-const endpoint = process.env.GRAFANA_LOKI_URL || 'https://logs-prod-021.grafana.net/loki/api/v1/push';
+const loggingConfig = config.logging || {};
+const source = loggingConfig.source || 'jwt-pizza-service';
+const endpoint = loggingConfig.endpointUrl;
 
 function sanitize(value, key = '') {
   if (/^authorizationHeader$/i.test(key) && typeof value === 'boolean') return value;
@@ -101,9 +103,8 @@ function logException(error, req) {
 }
 
 function log(level, type, event) {
-  const accountId = process.env.GRAFANA_ACCOUNT_ID;
-  const apiKey = process.env.GRAFANA_API_KEY;
-  if (!accountId || !apiKey) return;
+  const { accountId, apiKey } = loggingConfig;
+  if (!accountId || !apiKey || !endpoint) return;
 
   const timestamp = (Date.now() * 1_000_000).toString();
   const payload = {

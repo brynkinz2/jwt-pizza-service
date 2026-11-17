@@ -31,11 +31,10 @@ module.exports =  {
 };
 ```
 
-To send application logs to Grafana Loki, set `GRAFANA_ACCOUNT_ID` and
-`GRAFANA_API_KEY` in the service environment. The logger uses
-`https://logs-prod-021.grafana.net/loki/api/v1/push` by default; set
-`GRAFANA_LOKI_URL` to override it and `GRAFANA_SOURCE` to change the Loki
-`component` label. Log delivery is disabled when the account ID or API key is
+To send application logs to Grafana Loki, configure the `logging` object in
+`src/config.js` with `source`, `accountId`, `endpointUrl`, and `apiKey`. The CI
+workflow fills these from `LOGGING_ACCOUNT_ID`, `LOGGING_ENDPOINT_URL`, and
+`LOGGING_API_KEY`. Log delivery is disabled if any required logging setting is
 missing.
 
 ## Endpoints
