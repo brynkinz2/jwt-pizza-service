@@ -18,7 +18,8 @@ function sanitize(value, key = '') {
   }
 
   const text = String(value);
-  if (/^[\[{]/.test(text.trim())) {
+  const trimmedText = text.trim();
+  if (trimmedText.startsWith('{') || trimmedText.startsWith('[')) {
     try {
       return sanitize(JSON.parse(text));
     } catch {

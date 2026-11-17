@@ -45,6 +45,24 @@ You can get the documentation for all endpoints by making the following request.
 curl localhost:3000/api/docs
 ```
 
+## Traffic simulation
+
+With the service running locally, use the simulator to add a small amount of
+sample traffic to Grafana. It defaults to one request every five seconds for
+one minute, and stops automatically. Available modes are `mixed`, `success`,
+`database`, `notFound`, `unauthorized`, `badJson`, and `authenticated`.
+
+```sh
+node scripts/traffic-simulator.js mixed
+```
+
+The mixed mode includes a not-found request, an unauthorized request, and
+malformed JSON to exercise error logging. It also includes an authenticated
+database request when `JWT_PIZZA_EMAIL` and `JWT_PIZZA_PASSWORD` are set. The
+simulator only reads application data. To change the target or pacing, set
+`PIZZA_SERVICE_URL`, `TRAFFIC_INTERVAL_SECONDS`, or
+`TRAFFIC_DURATION_SECONDS`.
+
 ## Development notes
 
 Install the required packages.
